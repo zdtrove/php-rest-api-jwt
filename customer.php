@@ -43,6 +43,23 @@
             return $customers;
         }
 
+        public function getCustomerDetailsById() {
+            $sql = "SELECT
+                        c.*,
+                        u.name as created_user,
+                        u1.name as updated_user
+                    FROM customers c
+                        JOIN users u ON (c.created_by = u.id)
+                        LEFT JOIN users u1 ON (c.updated_by = u1.id)
+                    WHERE
+                        c.id = :customerId";
+            $stmt = $this->dbConn->prepare($sql);
+            $stmt->bindParam(':customerId', $this->id);
+            $stmt->execute();
+            $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $customer;
+        }
+
         public function insert() {
             $sql = "INSERT INTO $this->tableName " . '(id, name, email, address, mobile, created_by, created_on) VALUES (null, :name, :email, :address, :mobile, :createdBy, :createdOn)';
 

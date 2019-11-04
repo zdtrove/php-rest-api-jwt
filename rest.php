@@ -4,6 +4,8 @@
         protected $request;
         protected $serviceName;
         protected $param;
+        protected $dbConn;
+        protected $userId;
 
         public function __construct() {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -12,6 +14,13 @@
             $handler = fopen('php://input', 'r');
             $this->request = stream_get_contents($handler);
             $this->validateRequest($this->request);
+
+            $db = new DbConnect;
+            $this->dbConn = $db->connect();
+
+            if ('generatetoken' != strtolower($this->serviceName)) {
+                $this->validateToken();
+            }
         }
 
         public function validateRequest($request) {
@@ -119,5 +128,25 @@
                 }
             }
             $this->throwError(ATHORIZATION_HEADER_NOT_FOUND, 'Access Token Not Found.');
+        }
+
+        public function validateToken() {
+            try {
+                $token = $this->getBearerToken();
+                $payload = JWT::decode($token, SECRETE_KEY, ['HS256']);
+                $stmt = $this->dbConn->prepare("SELECT * FROM users WHERE id = :userId");
+                $stmt->bindParam(":userId", $payload->userId);
+                $stmt->execute();
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!is_array($user)) {
+                    $this->returnResponse(INVALID_USER_PASS, "This user is not found in our database.");
+                }
+                if ($user['active'] == 0) {
+                    $this->returnResponse(USER_NOT_ACTIVE, "This user may be decactived. Please contact to admin.");
+                }
+                $this->userId = $payload->userId;
+            } catch (Exception $e) {
+                $this->throwError(ACCESS_TOKEN_ERRORS, $e->getMessage());
+            }
         }
     }
